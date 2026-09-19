@@ -692,6 +692,7 @@ template <> struct reorder_vec_dot_q_sycl<GGML_TYPE_Q6_K> {
 #define VDR_Q4_0_Q8_1_MMQ  4
 
 #define VDR_Q2_0_Q8_1_MMVQ 1
+#define VDR_PQ2_0_Q8_1_MMVQ 1
 
 template <int vdr>
 static __dpct_inline__ float vec_dot_q2_0_q8_1_impl(
@@ -982,6 +983,33 @@ vec_dot_q2_0_q8_1(const void *__restrict__ vbq,
     const float sum1 = vec_dot_q2_0_q8_1_impl<VDR_Q2_0_Q8_1_MMVQ>(
         v + VDR_Q2_0_Q8_1_MMVQ, u + 4 * VDR_Q2_0_Q8_1_MMVQ, bq2_0->d, bq8_1[1].ds);
     return sum0 + sum1;
+}
+
+static __dpct_inline__ float
+vec_dot_pq2_0_q8_1(const void *__restrict__ vbq,
+                   const block_q8_1 *__restrict__ bq8_1, const int &iqs) {
+    const block_pq2_0 * bpq2_0 = (const block_pq2_0 *) vbq;
+    const block_q8_1 * bq8 = &bq8_1[iqs];
+
+    int v[2 * VDR_PQ2_0_Q8_1_MMVQ];
+    int u[8 * VDR_PQ2_0_Q8_1_MMVQ];
+
+    // Each PQ2_0 MMVQ slice is one Q8_1 block (32 values), represented by
+    // two packed 32-bit weight words (16 values each).
+    const int base = iqs * 2;
+    v[0] = get_int_from_uint8(bpq2_0->qs, base + 0);
+    v[1] = get_int_from_uint8(bpq2_0->qs, base + 1);
+
+#pragma unroll
+    for (int k = 0; k < 4; ++k) {
+        u[k + 0] = get_int_from_int8_aligned(bq8->qs, k);
+        u[k + 4] = get_int_from_int8_aligned(bq8->qs, k + 4);
+    }
+
+    return vec_dot_q2_0_q8_1_impl<VDR_PQ2_0_Q8_1_MMVQ>(
+               v + 0, u + 0, bpq2_0->d, bq8->ds) +
+           vec_dot_q2_0_q8_1_impl<VDR_PQ2_0_Q8_1_MMVQ>(
+               v + 1, u + 4, bpq2_0->d, bq8->ds);
 }
 
 static __dpct_inline__ float

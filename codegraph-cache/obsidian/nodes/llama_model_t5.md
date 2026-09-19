@@ -1,0 +1,12 @@
+---
+name: "llama_model_t5"
+type: "class"
+file: "src/models/models.h"
+community: "src"
+---
+
+# llama_model_t5
+
+**Type:** `class`  **File:** `src/models/models.h`
+
+**Community:** [[communities/src]]

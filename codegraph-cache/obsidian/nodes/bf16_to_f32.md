@@ -1,0 +1,12 @@
+---
+name: "bf16_to_f32"
+type: "function"
+file: "ggml/src/ggml-cpu/common.h"
+community: "ggml"
+---
+
+# bf16_to_f32
+
+**Type:** `function`  **File:** `ggml/src/ggml-cpu/common.h`
+
+**Community:** [[communities/ggml]]

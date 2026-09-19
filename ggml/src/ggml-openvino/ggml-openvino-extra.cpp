@@ -5,10 +5,13 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <openvino/runtime/intel_gpu/properties.hpp>
 #include <openvino/runtime/intel_gpu/ocl/ocl.hpp>
 #include <openvino/runtime/intel_npu/level_zero/level_zero.hpp>
 #include <openvino/runtime/properties.hpp>
 #include <optional>
+#include <stdexcept>
+#include <vector>
 
 ov::Core & ov_singleton_core() {
     static ov::Core core;
@@ -50,6 +53,7 @@ void ggml_openvino_device_config::init() {
         "GGML_OPENVINO_MEMORY_OPTIMIZE",
         "GGML_OPENVINO_RELEASE_WEIGHTS",
         "GGML_OPENVINO_REDUCE_COMPILE_MEM",
+        "GGML_OPENVINO_ENABLE_LARGE_ALLOCATIONS",
         "GGML_OPENVINO_COMPILED_MODEL_CACHE_DIR",
     };
 
@@ -90,22 +94,40 @@ void ggml_openvino_device_config::init() {
         compile_config.insert(ov::cache_mode(ov::CacheMode::OPTIMIZE_SIZE));
     }
 
+    // The plugin can use 64-bit addressing for large weight objects, but it may
+    // expose driver instability on devices that cannot satisfy the allocation.
+    // Keep this opt-in: set GGML_OPENVINO_ENABLE_LARGE_ALLOCATIONS=1 only when
+    // the installed driver and available memory have been validated.
+    if (device_name == "GPU" && ggml_openvino_getenv_int("GGML_OPENVINO_ENABLE_LARGE_ALLOCATIONS") != 0) {
+        compile_config.insert(ov::intel_gpu::hint::enable_large_allocations(true));
+    }
+
     // Initialize remote context with queue sharing for GPU
     if (device_name == "GPU") {
         // Create OpenCL context and queue
         cl_int err;
-        cl_platform_id platform;
-        err = clGetPlatformIDs(1, &platform, nullptr);
-        if (err != CL_SUCCESS) {
-            GGML_LOG_ERROR("Failed to get OpenCL platform: %d\n", err);
-            return;
+        cl_uint platform_count = 0;
+        err = clGetPlatformIDs(0, nullptr, &platform_count);
+        if (err != CL_SUCCESS || platform_count == 0) {
+            throw std::runtime_error("OpenVINO GPU: no OpenCL platforms available");
         }
 
-        cl_device_id cl_device;
-        err = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 1, &cl_device, nullptr);
+        std::vector<cl_platform_id> platforms(platform_count);
+        err = clGetPlatformIDs(platform_count, platforms.data(), nullptr);
         if (err != CL_SUCCESS) {
-            GGML_LOG_ERROR("Failed to get OpenCL device: %d\n", err);
-            return;
+            throw std::runtime_error("OpenVINO GPU: failed to enumerate OpenCL platforms");
+        }
+
+        cl_device_id cl_device = nullptr;
+        for (cl_platform_id candidate : platforms) {
+            if (clGetDeviceIDs(candidate, CL_DEVICE_TYPE_GPU, 1, &cl_device, nullptr) == CL_SUCCESS) {
+                cl_platform = candidate;
+                break;
+            }
+            cl_device = nullptr;
+        }
+        if (cl_device == nullptr) {
+            throw std::runtime_error("OpenVINO GPU: no OpenCL GPU device available");
         }
 
         cl_context cl_ctx = clCreateContext(nullptr, 1, &cl_device, nullptr, nullptr, &err);
@@ -216,8 +238,8 @@ clEnqueueMemFillINTEL_fn ggml_openvino_get_clEnqueueMemFillINTEL() {
     static bool loaded = false;
     if (!loaded) {
         loaded = true;
-        cl_platform_id platform;
-        if (clGetPlatformIDs(1, &platform, nullptr) == CL_SUCCESS) {
+        const cl_platform_id platform = ggml_openvino_get_device_config().cl_platform;
+        if (platform != nullptr) {
             fn = (clEnqueueMemFillINTEL_fn) clGetExtensionFunctionAddressForPlatform(platform, "clEnqueueMemFillINTEL");
         }
     }
@@ -230,8 +252,8 @@ clEnqueueMemcpyINTEL_fn ggml_openvino_get_clEnqueueMemcpyINTEL() {
     static bool loaded = false;
     if (!loaded) {
         loaded = true;
-        cl_platform_id platform;
-        if (clGetPlatformIDs(1, &platform, nullptr) == CL_SUCCESS) {
+        const cl_platform_id platform = ggml_openvino_get_device_config().cl_platform;
+        if (platform != nullptr) {
             fn = (clEnqueueMemcpyINTEL_fn) clGetExtensionFunctionAddressForPlatform(platform, "clEnqueueMemcpyINTEL");
         }
     }

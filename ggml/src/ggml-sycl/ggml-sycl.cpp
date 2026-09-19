@@ -109,6 +109,13 @@ int g_ggml_sycl_enable_host_pinned_mem = 1;
 static ggml_sycl_device_info ggml_sycl_init() {
     ggml_sycl_device_info info = {};
 
+    // Intel Arc's OpenCL path is the stable default for oneDNN-backed SYCL.
+    // Preserve an explicit selector so advanced users can opt into Level Zero.
+    if (std::getenv("ONEAPI_DEVICE_SELECTOR") == nullptr) {
+        setenv("ONEAPI_DEVICE_SELECTOR", "opencl:gpu", 0);
+        GGML_LOG_INFO("SYCL: defaulting Intel GPU device selection to opencl:gpu\n");
+    }
+
     // Do not hard crash when there exists no SYCL devices.
     // We want to allow the user to use non-SYCL tools when SYCL is compiled (such as llama-quantize)
     try {

@@ -1,0 +1,12 @@
+---
+name: "SteeringMessage"
+type: "class"
+file: "tools/ui/src/lib/types/agentic.d.ts"
+community: "tools"
+---
+
+# SteeringMessage
+
+**Type:** `class`  **File:** `tools/ui/src/lib/types/agentic.d.ts`
+
+**Community:** [[communities/tools]]

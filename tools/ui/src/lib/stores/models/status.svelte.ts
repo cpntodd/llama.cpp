@@ -15,6 +15,15 @@ import { serverStore } from '$lib/stores/server.svelte';
 import { SvelteMap } from 'svelte/reactivity';
 import { toast } from 'svelte-sonner';
 
+export type ModelBackend = 'auto' | 'vulkan' | 'openvino' | 'sycl';
+
+const MODEL_BACKEND_LOCALSTORAGE_KEY = 'llama.cpp-model-backend';
+const MODEL_BACKEND_DEVICES: Record<Exclude<ModelBackend, 'auto'>, string> = {
+	openvino: 'OPENVINO0',
+	sycl: 'SYCL0',
+	vulkan: 'Vulkan0'
+};
+
 /**
  * The slice of modelsStore the manager drives. Kept narrow on purpose so it
  * cannot reach around the host's full surface; modelsStore implements this
@@ -33,6 +42,7 @@ export interface ModelStatusHost {
 export class ModelStatusManager {
 	private loadingStates = new SvelteMap<string, boolean>();
 	private loadProgress = new SvelteMap<string, ModelLoadProgress>();
+	private selectedBackend = $state<ModelBackend>('auto');
 	// /models/sse feed state, the single source of truth for status and load progress
 	private statusAbort: AbortController | null = null;
 	private statusReaderActive = false;
@@ -41,7 +51,19 @@ export class ModelStatusManager {
 		{ target: ServerModelStatus; resolve: () => void; reject: (e: Error) => void }
 	>();
 
-	constructor(private host: ModelStatusHost) {}
+	get backend(): ModelBackend {
+		return this.selectedBackend;
+	}
+
+	constructor(private host: ModelStatusHost) {
+		if (typeof window !== 'undefined') {
+			const stored = localStorage.getItem(MODEL_BACKEND_LOCALSTORAGE_KEY);
+
+			if (stored === 'auto' || stored === 'vulkan' || stored === 'openvino' || stored === 'sycl') {
+				this.selectedBackend = stored;
+			}
+		}
+	}
 
 	async ensureLoaded(modelId: string): Promise<void> {
 		if (this.host.isModelLoaded(modelId)) return;
@@ -60,7 +82,7 @@ export class ModelStatusManager {
 		return this.loadingStates.get(modelId) ?? false;
 	}
 
-	async load(modelId: string): Promise<void> {
+	async load(modelId: string, backend: ModelBackend = this.selectedBackend): Promise<void> {
 		if (this.host.isModelLoaded(modelId)) return;
 
 		if (this.loadingStates.get(modelId)) return;
@@ -76,7 +98,12 @@ export class ModelStatusManager {
 		reachedLoaded.catch(() => {});
 
 		try {
-			await ModelsService.load(modelId);
+			const extraArgs =
+				backend === 'auto'
+					? undefined
+					: ['--device', MODEL_BACKEND_DEVICES[backend], '--n-gpu-layers', '99'];
+
+			await ModelsService.load(modelId, extraArgs);
 			await reachedLoaded;
 			toast.success(`Model loaded: ${this.host.toDisplayName(modelId)}`);
 		} catch (error) {
@@ -87,6 +114,14 @@ export class ModelStatusManager {
 			throw error;
 		} finally {
 			this.loadingStates.set(modelId, false);
+		}
+	}
+
+	setBackend(backend: ModelBackend): void {
+		this.selectedBackend = backend;
+
+		if (typeof window !== 'undefined') {
+			localStorage.setItem(MODEL_BACKEND_LOCALSTORAGE_KEY, backend);
 		}
 	}
 

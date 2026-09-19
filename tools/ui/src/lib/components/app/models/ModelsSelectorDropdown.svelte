@@ -15,6 +15,7 @@
 	import { KeyboardKey, ServerModelStatus } from '$lib/enums';
 	import { useModelsSelector } from '$lib/hooks/use-models-selector.svelte';
 	import { modelsStore } from '$lib/stores';
+	import type { ModelBackend } from '$lib/stores/models/status.svelte';
 	import { modelLoadFraction } from '$lib/utils';
 
 	interface Props {
@@ -247,6 +248,22 @@
 						emptyMessage="No models found."
 						isEmpty={ms.filteredOptions.length === 0 && ms.isCurrentModelInCache}
 					>
+						<label class="flex items-center justify-between gap-3 border-b px-2 py-2 text-xs">
+							<span class="font-medium text-muted-foreground">Inference backend</span>
+
+							<select
+								class="rounded-sm border bg-background px-2 py-1 text-foreground"
+								value={modelsStore.status.backend}
+								onchange={(event) =>
+									modelsStore.status.setBackend(event.currentTarget.value as ModelBackend)}
+							>
+								<option value="auto">Auto</option>
+								<option value="vulkan">Vulkan</option>
+								<option value="openvino">OpenVINO</option>
+								<option value="sycl">SYCL</option>
+							</select>
+						</label>
+
 						<div class="models-list">
 							{#if !ms.isCurrentModelInCache && currentModel}
 								<!-- Show unavailable model as first option (disabled) -->

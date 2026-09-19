@@ -1,0 +1,16 @@
+---
+name: "op_xielu"
+type: "function"
+file: "ggml/src/ggml-sycl/element_wise.cpp"
+community: "ggml"
+---
+
+# op_xielu
+
+**Type:** `function`  **File:** `ggml/src/ggml-sycl/element_wise.cpp`
+
+**Community:** [[communities/ggml]]
+
+## Used By
+
+- [[nodes/unary_op_xielu_kernel]] _calls_

@@ -1,0 +1,12 @@
+---
+name: "DatabaseMessageExtraMcpResource"
+type: "class"
+file: "tools/ui/src/lib/types/database.d.ts"
+community: "tools"
+---
+
+# DatabaseMessageExtraMcpResource
+
+**Type:** `class`  **File:** `tools/ui/src/lib/types/database.d.ts`
+
+**Community:** [[communities/tools]]

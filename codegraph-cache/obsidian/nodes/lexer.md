@@ -1,0 +1,12 @@
+---
+name: "lexer"
+type: "class"
+file: "common/jinja/lexer.h"
+community: "common"
+---
+
+# lexer
+
+**Type:** `class`  **File:** `common/jinja/lexer.h`
+
+**Community:** [[communities/common]]

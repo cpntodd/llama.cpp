@@ -65,6 +65,7 @@ struct ggml_openvino_device_config {
     std::optional<ov::RemoteContext> remote_context;
     ov::AnyMap compile_config;
     std::unordered_map<std::string, std::string> environment_variables;
+    cl_platform_id cl_platform = nullptr;
     cl_command_queue cl_queue = nullptr;
 
     void init();

@@ -1024,7 +1024,9 @@ void server_models::load(const std::string & name, const load_options & opts) {
         inst.meta.update_args(ctx_preset, bin_path); // render args
 
         std::vector<std::string> child_args = inst.meta.args; // copy
+        child_args.insert(child_args.end(), opts.extra_args.begin(), opts.extra_args.end());
         std::vector<std::string> child_env  = base_env; // copy
+        child_env.insert(child_env.end(), opts.extra_env.begin(), opts.extra_env.end());
         child_env.push_back("LLAMA_SERVER_ROUTER_PORT=" + std::to_string(base_params.port));
 
         if (opts.mode == SERVER_CHILD_MODE_DOWNLOAD) {
@@ -1955,7 +1957,58 @@ void server_models_routes::init_routes() {
             res_err(res, format_error_response("model is already running", ERROR_TYPE_INVALID_REQUEST));
             return res;
         }
-        models.load(meta->name);
+        server_models::load_options load_opts;
+        if (body.contains("extra_args")) {
+            const auto & extra_args = body.at("extra_args");
+            if (!extra_args.is_array() || extra_args.size() > 4 || (extra_args.size() % 2) != 0) {
+                res_err(res, format_error_response(
+                        "extra_args must contain at most two option-value pairs", ERROR_TYPE_INVALID_REQUEST));
+                return res;
+            }
+
+            for (size_t i = 0; i < extra_args.size();) {
+                if (!extra_args[i].is_string() || i + 1 >= extra_args.size() || !extra_args[i + 1].is_string()) {
+                    res_err(res, format_error_response(
+                            "extra_args must contain option-value string pairs", ERROR_TYPE_INVALID_REQUEST));
+                    return res;
+                }
+
+                const std::string option = extra_args[i].get<std::string>();
+                const std::string value  = extra_args[i + 1].get<std::string>();
+                if (option == "--device") {
+                    if (value != "Vulkan0" && value != "SYCL0" && value != "OPENVINO0") {
+                        res_err(res, format_error_response(
+                                "unsupported backend device", ERROR_TYPE_INVALID_REQUEST));
+                        return res;
+                    }
+                    if (value == "OPENVINO0") {
+                        load_opts.extra_env.push_back("GGML_OPENVINO_DEVICE=GPU");
+                    }
+                } else if (option == "--n-gpu-layers" || option == "-ngl") {
+                    try {
+                        size_t parsed = 0;
+                        const int n_gpu_layers = std::stoi(value, &parsed);
+                        if (parsed != value.size() || n_gpu_layers < 0 || n_gpu_layers > 999) {
+                            throw std::out_of_range("n-gpu-layers");
+                        }
+                    } catch (const std::exception &) {
+                        res_err(res, format_error_response(
+                                "invalid n-gpu-layers value", ERROR_TYPE_INVALID_REQUEST));
+                        return res;
+                    }
+                } else {
+                    res_err(res, format_error_response(
+                            "unsupported extra_args option", ERROR_TYPE_INVALID_REQUEST));
+                    return res;
+                }
+
+                load_opts.extra_args.push_back(option);
+                load_opts.extra_args.push_back(value);
+                i += 2;
+            }
+        }
+
+        models.load(meta->name, load_opts);
         res_ok(res, {{"success", true}});
         return res;
     };

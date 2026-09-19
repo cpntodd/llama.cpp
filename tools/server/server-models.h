@@ -251,6 +251,10 @@ public:
         server_child_mode mode = SERVER_CHILD_MODE_NORMAL;
         // used for spawning a downloading child process
         std::optional<server_model_meta> custom_meta = std::nullopt;
+        // validated request-scoped arguments appended after preset arguments
+        std::vector<std::string> extra_args;
+        // server-derived environment for the selected backend
+        std::vector<std::string> extra_env;
     };
 
     // load and unload model instances

@@ -1,0 +1,12 @@
+---
+name: "test_anthropic_thinking_history_in_template"
+type: "function"
+file: "tools/server/tests/unit/test_compat_anthropic.py"
+community: "tools"
+---
+
+# test_anthropic_thinking_history_in_template
+
+**Type:** `function`  **File:** `tools/server/tests/unit/test_compat_anthropic.py`
+
+**Community:** [[communities/tools]]

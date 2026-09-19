@@ -1,0 +1,12 @@
+---
+name: "get_all_tensor_metadata"
+type: "function"
+file: "examples/model-conversion/scripts/utils/inspect-org-model.py"
+community: "examples"
+---
+
+# get_all_tensor_metadata
+
+**Type:** `function`  **File:** `examples/model-conversion/scripts/utils/inspect-org-model.py`
+
+**Community:** [[communities/examples]]
